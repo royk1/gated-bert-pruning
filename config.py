@@ -77,9 +77,9 @@ class GatedBertConfig:
         self.dropout_rate = kwargs.get('dropout_rate', 0.0)
         
         # Training parameters
-        self.epochs = kwargs.get('epochs', 25)  # Quick test
+        self.epochs = kwargs.get('epochs', 28)  # Quick test
         self.batch_size = kwargs.get('batch_size', 96)
-        self.learning_rate = kwargs.get('learning_rate', 2e-5)
+        self.learning_rate = kwargs.get('learning_rate', 1e-5)
         
         # Operational parameters
         self.verbose = kwargs.get('verbose', 1)
@@ -93,11 +93,11 @@ class GatedBertConfig:
         self.gate_trainable = kwargs.get('gate_trainable', False)
         
         # Pruning configuration
-        self.enable_pruning = kwargs.get('enable_pruning', False)
-        self.pruning_method = kwargs.get('pruning_method', 'none')  # 'magnitude', 'movement', 'spt', or 'none'
+        self.enable_pruning = kwargs.get('enable_pruning', True)
+        self.pruning_method = kwargs.get('pruning_method', 'movement')  # 'magnitude', 'movement', 'spt', or 'none'
         self.start_sparsity = kwargs.get('start_sparsity', 0.0)
         self.end_sparsity = kwargs.get('end_sparsity', 0.99)
-        self.pruning_start_epoch = kwargs.get('pruning_start_epoch', 4)  # Start at epoch 2 (1-indexed)
+        self.pruning_start_epoch = kwargs.get('pruning_start_epoch', 1)  # Start at epoch 2 (1-indexed)
         #pruning_end_epoch: Optional[int] = None,   # If None, use total epochs
         self.pruning_end_epoch = kwargs.get('pruning_end_epoch', 23)                # Reach target sparsity by epoch 12
         
@@ -106,19 +106,19 @@ class GatedBertConfig:
         # Scale aggressiveness based on model size
         if self.model_size == 'tiny':
             # Aggressive schedule for tiny model (can handle it)
-            self.sparsity_steps = kwargs.get('sparsity_steps', [10,25,50,70,75,80,84,88,90,92,93,94,95,96,97,97.5,98,98.5,99,99.5])
+            self.sparsity_steps = kwargs.get('sparsity_steps', [40,60,80,85,90,91,92,93,94,95,96,97,98,99])
         elif self.model_size == 'small':
             # Moderate schedule for small model
-            self.sparsity_steps = kwargs.get('sparsity_steps', [10,25,50,70,75,80,84,88,90,92,93,94,95,96,97,97.5,98,98.5,99,99.5])
+            self.sparsity_steps = kwargs.get('sparsity_steps', [40,60,80,85,90,91,92,93,94,95,96,97,98,99])
         elif self.model_size == 'base':
             # Conservative schedule for base model
-            self.sparsity_steps = kwargs.get('sparsity_steps', [10,25,50,70,75,80,84,88,90,92,93,94,95,96,97,97.5,98,98.5,99,99.5])
+            self.sparsity_steps = kwargs.get('sparsity_steps', [40,60,80,85,90,91,92,93,94,95,96,97,98,99])
         elif self.model_size == 'large':
             # Very conservative schedule for large model
-            self.sparsity_steps = kwargs.get('sparsity_steps', [10,25,50,70,75,80,84,88,90,92,93,94,95,96,97,97.5,98,98.5,99,99.5])
+            self.sparsity_steps = kwargs.get('sparsity_steps', [40,60,80,85,90,91,92,93,94,95,96,97,98,99])
         else:
             # Default to conservative schedule
-            self.sparsity_steps = kwargs.get('sparsity_steps', [10,25,50,70,75,80,84,88,90,92,93,94,95,96,97,97.5,98,98.5,99,99.5])
+            self.sparsity_steps = kwargs.get('sparsity_steps', [40,60,80,85,90,91,92,93,94,95,96,97,98,99])
             
         # SPT pruning specific parameters (per-weight SPT only)
         # Scale epsilon inversely with model size to prevent over-exploration
@@ -126,11 +126,11 @@ class GatedBertConfig:
         if self.model_size == 'tiny':
             self.spt_epsilon = kwargs.get('spt_epsilon', base_epsilon)
         elif self.model_size == 'small':
-            self.spt_epsilon = kwargs.get('spt_epsilon', base_epsilon * 0.5)  # Half exploration
+            self.spt_epsilon = kwargs.get('spt_epsilon', base_epsilon)  # Half exploration
         elif self.model_size == 'base':
-            self.spt_epsilon = kwargs.get('spt_epsilon', base_epsilon * 0.25)  # Quarter exploration
+            self.spt_epsilon = kwargs.get('spt_epsilon', base_epsilon)  # Quarter exploration
         elif self.model_size == 'large':
-            self.spt_epsilon = kwargs.get('spt_epsilon', base_epsilon * 0.1)  # Tenth exploration
+            self.spt_epsilon = kwargs.get('spt_epsilon', base_epsilon)  # Tenth exploration
         else:
             self.spt_epsilon = kwargs.get('spt_epsilon', base_epsilon)
             
@@ -146,11 +146,11 @@ class GatedBertConfig:
         if self.model_size == 'tiny':
             self.movement_pruning_frequency_steps = kwargs.get('movement_pruning_frequency_steps', base_frequency)
         elif self.model_size == 'small':
-            self.movement_pruning_frequency_steps = kwargs.get('movement_pruning_frequency_steps', base_frequency * 2)
+            self.movement_pruning_frequency_steps = kwargs.get('movement_pruning_frequency_steps', base_frequency)
         elif self.model_size == 'base':
-            self.movement_pruning_frequency_steps = kwargs.get('movement_pruning_frequency_steps', base_frequency * 4)
+            self.movement_pruning_frequency_steps = kwargs.get('movement_pruning_frequency_steps', base_frequency)
         elif self.model_size == 'large':
-            self.movement_pruning_frequency_steps = kwargs.get('movement_pruning_frequency_steps', base_frequency * 8)
+            self.movement_pruning_frequency_steps = kwargs.get('movement_pruning_frequency_steps', base_frequency)
         else:
             self.movement_pruning_frequency_steps = kwargs.get('movement_pruning_frequency_steps', base_frequency)
             

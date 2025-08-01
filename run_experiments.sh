@@ -491,8 +491,9 @@ try:
 
     # Update sparsity_steps parameter
     if "${SPARSITY_STEPS}" != "":
-        # Convert space-separated string to comma-separated Python list
-        steps_list="[$(echo "${SPARSITY_STEPS}" | sed 's/ /,/g')]"
+        # Convert space-separated or comma-separated string to proper Python list
+        # Remove duplicates and create clean list
+        steps_list="[$(echo "${SPARSITY_STEPS}" | tr ',' ' ' | tr -s ' ' | sed 's/^ *//;s/ *$//' | tr ' ' '\n' | sort -u | tr '\n' ',' | sed 's/,$//')]"
         content = re.sub(r"self\.sparsity_steps = kwargs\.get\('sparsity_steps', [^)]+\)", 
                         f"self.sparsity_steps = kwargs.get('sparsity_steps', {steps_list})", content)
     else:
@@ -591,9 +592,10 @@ run_training_parallel() {
     cp data_utils.py "$job_dir/" 2>/dev/null || true
     cp utils.py "$job_dir/" 2>/dev/null || true
     
-    # Create method-specific log file
-    local log_file="${LOG_DIR}/${results_suffix}_training_$(date +%Y%m%d_%H%M%S)_job${job_id}.log"
-    local results_dir="results_${results_suffix}_${TASK}"
+    # Create method-specific log file (use absolute path from original directory)
+local original_dir="$(pwd)"
+local log_file="${original_dir}/${LOG_DIR}/${results_suffix}_training_$(date +%Y%m%d_%H%M%S)_job${job_id}.log"
+local results_dir="${original_dir}/results_${results_suffix}_${TASK}"
     
     # Create a temporary script for this job
     local job_script="/tmp/training_job_${method}_${job_id}.sh"
@@ -608,6 +610,9 @@ run_training_parallel() {
 
 # Set up environment
 cd "$job_dir"
+
+# Ensure log directory exists in the original directory
+mkdir -p "${original_dir}/${LOG_DIR}"
 
 # Update config for this specific job
 echo "[JOB $job_id] Updating config for method: $method"
@@ -656,7 +661,9 @@ try:
 
     # Update sparsity_steps parameter
     if "$SPARSITY_STEPS" != "":
-        steps_list="[$(echo "$SPARSITY_STEPS" | sed 's/ /,/g')]"
+        # Convert space-separated or comma-separated string to proper Python list
+        # Remove duplicates and create clean list
+        steps_list="[$(echo "$SPARSITY_STEPS" | tr ',' ' ' | tr -s ' ' | sed 's/^ *//;s/ *$//' | tr ' ' '\n' | sort -u | tr '\n' ',' | sed 's/,$//')]"
         content = re.sub(r"self\.sparsity_steps = kwargs\.get\('sparsity_steps', [^)]+\)", 
                         f"self.sparsity_steps = kwargs.get('sparsity_steps', {steps_list})", content)
     else:
@@ -678,13 +685,14 @@ except Exception as e:
     sys.exit(1)
 PYTHON_SCRIPT
 
-# Run the Python script
+# Run the Python script with better error handling
 if python update_config_job.py; then
     rm update_config_job.py
     echo "[JOB $job_id] Config updated successfully"
 else
     rm -f update_config_job.py
     echo "[JOB $job_id] Failed to update config"
+    echo "[JOB $job_id] Python script exit code: $?"
     exit 1
 fi
 
@@ -699,7 +707,8 @@ send_output() {
     echo "[JOB $job_id] \$message" > "$output_pipe"
 }
 
-# Start training with real-time output monitoring
+# Start training with real-time output monitoring and better error handling
+set -e  # Exit on any error in the job script
 if python train.py 2>&1 | while IFS= read -r line; do
     echo "\$line" >> "$log_file"
     echo "[JOB $job_id] \$line" > "$output_pipe"
@@ -743,6 +752,7 @@ EOF
     local job_pid=$!
     
     echo "[PARALLEL] Started job $job_id for method $method (PID: $job_pid)"
+    echo "$job_pid" > "/tmp/job_pid_${job_id}.txt"
     return $job_pid
 }
 
@@ -982,11 +992,8 @@ run_experiments_parallel() {
     
     print_info "Output mode: $OUTPUT_MODE"
     
-    # Start output monitor in background
-    start_output_monitor &
-    local monitor_pid=$!
-    
-    print_info "Output monitor started (PID: $monitor_pid)"
+    # Simple parallel execution without complex monitoring
+    print_info "Starting parallel jobs..."
     
     # Function to check job results
     check_job_results() {
@@ -1006,8 +1013,9 @@ run_experiments_parallel() {
                     experiment_failed=true
                 fi
                 
-                # Remove the result file
+                # Remove the result file and PID file
                 rm -f "$result_file"
+                rm -f "/tmp/job_pid_${job_id}.txt"
             fi
         done
     }
@@ -1053,8 +1061,17 @@ run_experiments_parallel() {
             # Count active jobs
             active_jobs=0
             for i in "${!job_pids[@]}"; do
-                if kill -0 "${job_pids[$i]}" 2>/dev/null; then
-                    active_jobs=$((active_jobs + 1))
+                local job_id="${job_ids[$i]}"
+                local pid_file="/tmp/job_pid_${job_id}.txt"
+                
+                if [ -f "$pid_file" ]; then
+                    local job_pid=$(cat "$pid_file")
+                    if kill -0 "$job_pid" 2>/dev/null; then
+                        active_jobs=$((active_jobs + 1))
+                    else
+                        # Job completed, remove PID file
+                        rm -f "$pid_file"
+                    fi
                 fi
             done
             
@@ -1086,9 +1103,16 @@ run_experiments_parallel() {
             
             # Check for completed jobs
             for i in "${!job_pids[@]}"; do
-                if ! kill -0 "${job_pids[$i]}" 2>/dev/null; then
-                    running_jobs=$((running_jobs - 1))
-                    print_info "Job ${job_ids[$i]} (${job_methods[$i]}) completed"
+                local job_id="${job_ids[$i]}"
+                local pid_file="/tmp/job_pid_${job_id}.txt"
+                
+                if [ -f "$pid_file" ]; then
+                    local job_pid=$(cat "$pid_file")
+                    if ! kill -0 "$job_pid" 2>/dev/null; then
+                        running_jobs=$((running_jobs - 1))
+                        print_info "Job ${job_ids[$i]} (${job_methods[$i]}) completed"
+                        rm -f "$pid_file"
+                    fi
                 fi
             done
         fi
@@ -1100,9 +1124,8 @@ run_experiments_parallel() {
     
     print_success "All parallel jobs completed!"
     
-    # Stop the output monitor
-    kill $monitor_pid 2>/dev/null || true
-    wait $monitor_pid 2>/dev/null || true
+    # Wait for any remaining background jobs
+    wait
     
     # Clean up pipes
     rm -f /tmp/job_output_*.pipe

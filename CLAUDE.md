@@ -521,6 +521,15 @@ At the end of each epoch, SPT performs permanent pruning based on accumulated sc
 
 ## Recent Major Updates
 
+### **GPU Support (Latest)**
+- Added comprehensive GPU support for both NVIDIA CUDA and Apple MPS
+- Implemented automatic GPU detection and configuration in `utils.setup_tensorflow()`
+- Added platform-specific optimizations for different GPU types
+- Implemented CPU fallback when no GPU is available
+- Added test script `test_gpu_support.py` for verifying GPU functionality
+- Maintained backward compatibility with existing MPS support
+- Added GPU memory growth configuration and soft device placement
+
 ### **Parallel Execution (Latest)**
 - Added `-parallel` flag for simultaneous execution of all pruning methods
 - Implemented real-time progress monitoring with multiple output modes:

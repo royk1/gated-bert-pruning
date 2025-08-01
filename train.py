@@ -7,24 +7,14 @@ import sys
 # Suppress TensorFlow warnings
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-# Enable Metal GPU for performance
-os.environ['TF_DISABLE_MPS'] = '0'  # Enable Metal Performance Shaders
-os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
-
 # Use new Keras 3.x instead of legacy tf.keras
 os.environ['TF_USE_LEGACY_KERAS'] = 'false'
 os.environ['TF_ENABLE_DEPRECATION_WARNINGS'] = 'false'
+
+# General GPU optimizations (will be overridden by specific GPU detection)
 os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
 
-# Additional environment variables for Metal GPU stability
-os.environ['TF_GPU_ALLOCATOR'] = 'cuda_malloc_async'
-
-# Metal-specific environment variables
-os.environ['METAL_DEVICE_WRAPPER_TYPE'] = '1'
-os.environ['METAL_DEVICE_WRAPPER_TYPE_1'] = '1'
-
-print("Environment variables set. TF_DISABLE_MPS =", os.environ.get('TF_DISABLE_MPS'))
-print("CUDA_VISIBLE_DEVICES =", os.environ.get('CUDA_VISIBLE_DEVICES'))
+print("Environment variables set. TF_CPP_MIN_LOG_LEVEL =", os.environ.get('TF_CPP_MIN_LOG_LEVEL'))
 print("TF_USE_LEGACY_KERAS =", os.environ.get('TF_USE_LEGACY_KERAS'))
 
 import tensorflow as tf
@@ -36,13 +26,9 @@ from movement_layers import MovementGatedDense
 from keras.callbacks import Callback
 from keras import Model
  
-# Setup TensorFlow
-tf.get_logger().setLevel('ERROR')
-
-# Enable soft device placement to handle CPU/GPU operation mixing
-tf.config.set_soft_device_placement(True)
-print(f"Num GPUs Available: {len(tf.config.list_physical_devices('GPU'))}")
-print(f"Using GPU: {tf.config.list_physical_devices('GPU')}")
+# Setup TensorFlow with GPU detection (this will configure CUDA/MPS automatically)
+from utils import setup_tensorflow
+setup_tensorflow()
 
 # Suppress warnings
 import warnings
