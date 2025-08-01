@@ -113,11 +113,6 @@ def setup_tensorflow():
     import os
     import platform
     
-    print("=== TensorFlow GPU Configuration ===")
-    print(f"Platform: {platform.system()} {platform.release()}")
-    print(f"Python: {platform.python_version()}")
-    print(f"TensorFlow: {tf.__version__}")
-    
     # Configure TensorFlow for optimal performance
     try:
         tf.config.optimizer.set_jit(False)
@@ -131,73 +126,31 @@ def setup_tensorflow():
         gpus = tf.config.experimental.list_physical_devices('GPU')
         cpus = tf.config.experimental.list_physical_devices('CPU')
         
-        print(f"Available CPUs: {len(cpus)}")
-        print(f"Available GPUs: {len(gpus)}")
+        # Minimal logging for performance
+        print(f"GPU Configuration: {len(gpus)} GPU(s), {len(cpus)} CPU(s)")
         
         if gpus:
-            print("GPU devices found:")
-            for i, gpu in enumerate(gpus):
-                print(f"  GPU {i}: {gpu}")
-            
             # Configure GPU memory growth and device placement
-            try:
-                for gpu in gpus:
-                    tf.config.experimental.set_memory_growth(gpu, True)
-                print("✅ GPU memory growth enabled")
-                
-                # Enable soft device placement for better compatibility
-                tf.config.set_soft_device_placement(True)
-                print("✅ Soft device placement enabled")
-                
-                # Detect GPU type and configure accordingly
-                gpu_name = ""
-                try:
-                    # Try to get GPU name (this might not work on all platforms)
-                    gpu_details = tf.config.experimental.get_device_details(gpus[0])
-                    if gpu_details:
-                        gpu_name = gpu_details.get('device_name', 'Unknown GPU')
-                except:
-                    pass
-                
-                if 'nvidia' in gpu_name.lower() or 'cuda' in gpu_name.lower():
-                    print(f"✅ NVIDIA CUDA GPU detected: {gpu_name}")
-                    # CUDA-specific optimizations
-                    os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
-                    os.environ['TF_GPU_ALLOCATOR'] = 'cuda_malloc_async'
-                    print("✅ CUDA optimizations applied")
-                    
-                elif 'metal' in gpu_name.lower() or platform.system() == 'Darwin':
-                    print(f"✅ Apple Metal GPU detected: {gpu_name}")
-                    # Metal-specific optimizations
-                    os.environ['TF_DISABLE_MPS'] = '0'  # Enable Metal Performance Shaders
-                    os.environ['METAL_DEVICE_WRAPPER_TYPE'] = '1'
-                    os.environ['METAL_DEVICE_WRAPPER_TYPE_1'] = '1'
-                    print("✅ Metal optimizations applied")
-                    
-                else:
-                    print(f"✅ Generic GPU detected: {gpu_name}")
-                    # Generic GPU optimizations
-                    os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
-                    print("✅ Generic GPU optimizations applied")
-                
-                # Test GPU availability
-                try:
-                    with tf.device('/GPU:0'):
-                        test_tensor = tf.constant([1.0, 2.0, 3.0])
-                        test_result = tf.reduce_sum(test_tensor)
-                        print(f"✅ GPU test successful: {test_result.numpy()}")
-                except Exception as gpu_test_error:
-                    print(f"⚠️  GPU test failed: {gpu_test_error}")
-                    print("Continuing with CPU fallback")
-                    
-            except Exception as gpu_error:
-                print(f"⚠️  GPU setup warning: {gpu_error}")
-                print("Continuing with GPU support")
+            for gpu in gpus:
+                tf.config.experimental.set_memory_growth(gpu, True)
+            
+            # Enable soft device placement for better compatibility
+            tf.config.set_soft_device_placement(True)
+            
+            # Quick GPU type detection (minimal overhead)
+            if platform.system() == 'Darwin':
+                # Apple Metal optimizations
+                os.environ['TF_DISABLE_MPS'] = '0'
+                os.environ['METAL_DEVICE_WRAPPER_TYPE'] = '1'
+                os.environ['METAL_DEVICE_WRAPPER_TYPE_1'] = '1'
+                print("✅ Apple Metal GPU configured")
+            else:
+                # Generic GPU optimizations
+                os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
+                print("✅ GPU configured")
         else:
             print("No GPU devices found, using CPU")
-            # CPU-specific optimizations
-            os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # Reduce CPU logging
-            print("✅ CPU optimizations applied")
+            os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
             
     except Exception as e:
         print(f"⚠️  TensorFlow setup error: {e}")
@@ -205,16 +158,3 @@ def setup_tensorflow():
     
     # Set random seed for reproducibility
     tf.random.set_seed(42)
-    print("✅ Random seed set to 42")
-    
-    # Final device summary
-    print("\n=== Final Device Configuration ===")
-    try:
-        logical_devices = tf.config.list_logical_devices()
-        print("Logical devices:")
-        for device in logical_devices:
-            print(f"  {device.device_type}: {device.name}")
-    except Exception as e:
-        print(f"Could not list logical devices: {e}")
-    
-    print("=== TensorFlow Setup Complete ===\n")

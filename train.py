@@ -215,8 +215,8 @@ class CustomFitModel(Model):
 def main():
     """Main training function."""
     
-    # Setup TensorFlow
-    setup_tensorflow()
+    # TensorFlow is already set up at module level
+    # No need to call setup_tensorflow() again
     
     # Configuration - Use defaults from config.py
     config = GatedBertConfig()
